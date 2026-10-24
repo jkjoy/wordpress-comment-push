@@ -1,0 +1,37 @@
+name: Publish WordPress plugin
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v[0-9]*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.0'
+          coverage: none
+      - name: Check PHP syntax
+        run: find . -name '*.php' -not -path './.git/*' -print0 | xargs -0 -n 1 php -l
+      - name: Build installable plugin
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then
+            python3 tools/build-release.py --tag "$GITHUB_REF_NAME"
+          else
+            python3 tools/build-release.py
+          fi
+      - name: Publish release and update package
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME" dist/comment-push.zip
+          --verify-tag --title "QQ / 微信评论推送 $GITHUB_REF_NAME" --generate-notes
